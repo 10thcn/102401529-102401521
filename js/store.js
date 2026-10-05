@@ -35,8 +35,15 @@
   var storage = null;
   function getStorage() {
     if (storage) return storage;
-    if (typeof localStorage !== 'undefined') storage = localStorage;
-    else storage = createMemoryStorage();
+    try {
+      /* 个别隐私模式/受限环境下访问 localStorage 会抛 SecurityError，
+         此时降级为内存存储：功能可用，只是刷新后数据不保留 */
+      if (typeof localStorage !== 'undefined') {
+        localStorage.getItem('__probe');
+        storage = localStorage;
+      }
+    } catch (e) { /* 落入下方内存兜底 */ }
+    if (!storage) storage = createMemoryStorage();
     return storage;
   }
   /** 测试钩子：注入自定义存储实现 */
