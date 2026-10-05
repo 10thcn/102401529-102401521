@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>发布信息 - 校园失物招领</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <!-- 顶部栏 -->
+  <div class="topbar">
+    <a class="back" href="index.html" title="返回首页">‹</a>
+    <div class="t-title">发布信息</div>
+  </div>
+
+  <!-- 类型切换：寻物 / 招领 -->
+  <div class="seg">
+    <div class="seg-item on" data-type="lost">寻物</div>
+    <div class="seg-item" data-type="found">招领</div>
+  </div>
+
+  <!-- 小贴士：随类型切换 -->
+  <div class="tip" id="tipBox"></div>
+
+  <div class="app-body">
+    <!-- 发布表单：带 * 为必填项 -->
+    <div class="form" id="pubForm">
+      <div class="fitem" data-field="name">
+        <label>物品名称 <i>*</i></label>
+        <input id="fName" type="text" maxlength="20" placeholder="请输入物品名称，如：校园卡" autocomplete="off">
+        <div class="ferr"></div>
+      </div>
+      <div class="fitem" data-field="category">
+        <label>物品类别 <i>*</i></label>
+        <select id="fCategory">
+          <option value="" selected disabled>请选择物品类别</option>
+          <option value="校园卡">校园卡</option>
+          <option value="钥匙">钥匙</option>
+          <option value="电子产品">电子产品</option>
+          <option value="书籍">书籍</option>
+          <option value="衣物">衣物</option>
+          <option value="其他">其他</option>
+        </select>
+        <div class="ferr"></div>
+      </div>
+      <div class="fitem" data-field="location">
+        <label id="locLabel">丢失地点 <i>*</i></label>
+        <select id="fLocation">
+          <option value="" selected disabled>请选择地点</option>
+          <option value="教学楼">教学楼</option>
+          <option value="宿舍区">宿舍区</option>
+          <option value="食堂">食堂</option>
+          <option value="图书馆">图书馆</option>
+          <option value="运动场">运动场</option>
+          <option value="其他">其他</option>
+        </select>
+        <div class="ferr"></div>
+      </div>
+      <div class="fitem" data-field="time">
+        <label id="timeLabel">丢失时间 <i>*</i></label>
+        <input id="fTime" type="datetime-local">
+        <div class="ferr"></div>
+      </div>
+      <div class="fitem" data-field="desc">
+        <label>物品描述</label>
+        <textarea id="fDesc" maxlength="200" placeholder="补充描述物品特征、丢失/拾取经过等"></textarea>
+        <div class="ferr"></div>
+      </div>
+      <div class="fitem" data-field="contact">
+        <label>联系方式 <i>*</i></label>
+        <input id="fContact" type="text" maxlength="50" placeholder="微信号 / 手机号 / QQ" autocomplete="off">
+        <div class="ferr"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 发布按钮（底部固定） -->
+  <div class="foot-bar">
+    <button class="publish-btn" id="pubBtn">发 布</button>
+  </div>
+</div>
+
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  Store.ensureSeed();
+
+  /* 当前表单类型：lost(寻物) / found(招领) */
+  var type = 'lost';
+
+  /* 时间输入框默认当前时间 */
+  document.getElementById('fTime').value = Store.toLocalInput(new Date());
+
+  /* 类型切换：分段控件高亮 + 文案联动（地点/时间的标签与贴士） */
+  var tipTexts = {
+    lost: '寻物小贴士：请尽量写清物品特征与丢失经过，方便拾到者核对。',
+    found: '招领小贴士：为防冒领，描述请勿透露物品全部细节，可凭特征与拾主核对后归还。'
+  };
+  function applyType() {
+    document.querySelectorAll('.seg-item').forEach(function (seg) {
+      seg.classList.toggle('on', seg.getAttribute('data-type') === type);
+      seg.classList.toggle('seg-found', seg.getAttribute('data-type') === 'found');
+    });
+    document.getElementById('locLabel').innerHTML = (type === 'lost' ? '丢失地点' : '拾取地点') + ' <i>*</i>';
+    document.getElementById('timeLabel').innerHTML = (type === 'lost' ? '丢失时间' : '拾取时间') + ' <i>*</i>';
+    document.getElementById('tipBox').textContent = tipTexts[type];
+  }
+  document.querySelectorAll('.seg-item').forEach(function (seg) {
+    seg.addEventListener('click', function () {
+      type = seg.getAttribute('data-type');
+      applyType();
+    });
+  });
+  applyType();
+
+  /* 读取表单并校验；错误逐项显示在字段下方 */
+  function collectForm() {
+    return {
+      type: type,
+      name: document.getElementById('fName').value,
+      category: document.getElementById('fCategory').value,
+      location: document.getElementById('fLocation').value,
+      time: document.getElementById('fTime').value,
+      desc: document.getElementById('fDesc').value,
+      contact: document.getElementById('fContact').value
+    };
+  }
+  function showErrors(errors) {
+    document.querySelectorAll('#pubForm .fitem').forEach(function (item) {
+      var field = item.getAttribute('data-field');
+      var msg = errors[field];
+      item.classList.toggle('err', !!msg);
+      item.querySelector('.ferr').textContent = msg || '';
+    });
+  }
+
+  /* 发布流程：校验 → 相似信息提醒 → 入库 → 成功提示 */
+  function publish() {
+    var form = collectForm();
+    var result = Store.validateItem(form);
+    showErrors(result.errors);
+    if (Object.keys(result.errors).length) return; // 校验不通过，停在表单
+
+    var similar = Store.findSimilar(form);
+    if (similar.length) {
+      /* 有相似信息：先给用户确认的机会，避免重复发布 */
+      var listHTML = '<div class="sim-list">' + similar.map(function (it) {
+        return '<a class="sim-item" href="detail.html?id=' + encodeURIComponent(it.id) + '">' +
+          '<span class="sim-name">' + UI.esc(it.name) + '</span>' +
+          UI.typePill(it) +
+          '<span class="sim-meta">' + UI.esc(it.location) + ' · ' + UI.esc(Store.formatTime(it.time)) + '</span>' +
+        '</a>';
+      }).join('') + '</div>';
+      UI.dialog({
+        title: '发现相似信息',
+        sub: '已有 ' + similar.length + ' 条同类型的未解决信息，可先点击查看，确认是否就是这件物品：',
+        bodyHTML: listHTML,
+        okText: '仍然发布',
+        cancelText: '先去看看',
+        onOk: doPublish
+      });
+    } else {
+      doPublish();
+    }
+  }
+
+  function doPublish() {
+    var form = collectForm();
+    Store.addItem(form); // 校验已通过，直接入库
+    UI.toast({
+      icon: '✓',
+      title: '发布成功！',
+      sub: '信息已发布，可在首页和"我的发布"中查看',
+      btnText: '返回首页',
+      onBtn: function () { location.href = 'index.html'; }
+    });
+  }
+
+  document.getElementById('pubBtn').addEventListener('click', publish);
+
+  /* 输入时即时清除该字段的错误提示 */
+  document.querySelectorAll('#pubForm input, #pubForm textarea, #pubForm select').forEach(function (el) {
+    el.addEventListener('input', function () {
+      var item = el.closest('.fitem');
+      if (item.classList.contains('err')) {
+        item.classList.remove('err');
+        item.querySelector('.ferr').textContent = '';
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
