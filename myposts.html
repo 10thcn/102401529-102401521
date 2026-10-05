@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的发布 - 校园失物招领</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <!-- 顶部栏 -->
+  <div class="topbar"><div class="t-title">我的发布</div></div>
+
+  <!-- 本机发布的物品列表 -->
+  <div class="app-body"><div class="cards" id="myList"></div></div>
+
+  <!-- 底部标签栏 -->
+  <div class="tabbar">
+    <a class="tbi" href="index.html">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span>首页</span>
+    </a>
+    <a class="tbi" href="publish.html">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>发布</span>
+    </a>
+    <a class="tbi on" href="myposts.html">
+      <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>我的</span>
+    </a>
+  </div>
+</div>
+
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  Store.ensureSeed();
+
+  var listEl = document.getElementById('myList');
+
+  /* 操作行：查看 / 修改状态 / 删除（卡片点击进入详情时排除按钮区域） */
+  function actionRow(item) {
+    var isLost = item.type === 'lost';
+    var statusBtn = item.status === 'resolved'
+      ? '改回未解决'
+      : (isLost ? '标记已找到' : '标记已归还');
+    return '<div class="action-row">' +
+      '<button class="btn-mini" data-act="view">查看</button>' +
+      '<button class="btn-mini" data-act="status">' + statusBtn + '</button>' +
+      '<button class="btn-mini danger" data-act="del">删除</button>' +
+    '</div>';
+  }
+
+  function render() {
+    var items = Store.sortItems(Store.getMyItems());
+    if (!items.length) {
+      listEl.innerHTML = UI.emptyHTML({
+        icon: '📭',
+        text: '你还没有发布过信息\n发布寻物或招领信息后，会显示在这里',
+        link: 'publish.html',
+        linkText: '去发布'
+      });
+      return;
+    }
+    listEl.innerHTML = items.map(function (it) {
+      return UI.cardHTML(it, actionRow(it));
+    }).join('');
+  }
+
+  /* 事件委托：区分"点击卡片进详情"与"点击操作按钮" */
+  listEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    var card = e.target.closest('.card');
+    if (!card) return;
+    var id = card.getAttribute('data-id');
+    var item = Store.getById(id);
+
+    if (btn) {
+      var act = btn.getAttribute('data-act');
+      if (act === 'view') {
+        location.href = 'detail.html?id=' + encodeURIComponent(id);
+      } else if (act === 'status') {
+        changeStatus(item);
+      } else if (act === 'del') {
+        confirmDelete(item);
+      }
+      return; // 操作按钮不触发卡片跳转
+    }
+    location.href = 'detail.html?id=' + encodeURIComponent(id);
+  });
+
+  /* 修改状态：未解决 <-> 已找到/已归还，弹窗确认后即时刷新 */
+  function changeStatus(item) {
+    var toResolved = item.status !== 'resolved';
+    var isLost = item.type === 'lost';
+    UI.dialog({
+      title: toResolved ? '确认标记状态？' : '确认改回未解决？',
+      sub: toResolved
+        ? '标记后，其他同学在首页将看到"' + (isLost ? '已找到' : '已归还') + '"，不再产生无效询问'
+        : '如果物品仍未找到/归还，可以改回"未解决"',
+      okText: toResolved ? '确认标记' : '确认改回',
+      onOk: function () {
+        Store.updateStatus(item.id, toResolved ? 'resolved' : 'active');
+        render(); // 状态标签即时更新
+      }
+    });
+  }
+
+  /* 删除：二次确认后移除，列表即时刷新 */
+  function confirmDelete(item) {
+    UI.dialog({
+      title: '确认删除？',
+      sub: '删除后不可恢复，其他同学也无法再看到这条信息',
+      okText: '确认删除',
+      danger: true,
+      onOk: function () {
+        Store.deleteItem(item.id);
+        render();
+      }
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
