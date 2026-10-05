@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>详情 - 校园失物招领</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <!-- 顶部栏 -->
+  <div class="topbar">
+    <a class="back" href="index.html" title="返回"
+       onclick="if (document.referrer.indexOf('campus-lost-found') !== -1) { history.back(); return false; }">‹</a>
+    <div class="t-title">详情</div>
+  </div>
+
+  <div class="app-body" id="detailBody">
+    <!-- 由脚本按 ?id= 渲染 -->
+    <div class="empty" style="padding-top:120px;">
+      <div class="empty-ic">⏳</div>
+      <div class="empty-txt">加载中…</div>
+    </div>
+  </div>
+
+  <!-- 底部操作区（由脚本按"是否本人发布"渲染） -->
+  <div class="cta" id="ctaBar" style="display:none;"></div>
+</div>
+
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  Store.ensureSeed();
+
+  var id = new URLSearchParams(location.search).get('id') || '';
+  var item = Store.getById(id);
+  var body = document.getElementById('detailBody');
+  var cta = document.getElementById('ctaBar');
+
+  /* 信息不存在（直接访问/已被删除）时的兜底 */
+  if (!item) {
+    body.innerHTML = UI.emptyHTML({
+      icon: '😕',
+      text: '没有找到这条信息\n它可能已被发布者删除',
+      link: 'index.html',
+      linkText: '返回首页'
+    });
+    return;
+  }
+
+  var isLost = item.type === 'lost';
+  var timeLabel = isLost ? '丢失时间' : '拾取时间';
+
+  /* 状态时间线：展示"何时被标记为已找到/已归还" */
+  var tl = item.status === 'resolved'
+    ? '<div class="tl"><span class="tl-ic">✅</span>已于 ' +
+        UI.esc(Store.formatTime(item.resolvedAt)) + ' 标记为' +
+        (isLost ? '已找到' : '已归还') + '，感谢大家的帮助！</div>'
+    : '';
+
+  body.innerHTML =
+    '<div class="imgph">' +
+      '<svg viewBox="0 0 24 24" width="34" height="34"><path d="M4 7h3l2-2h6l2 2h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>' +
+      '<div>物品图片（本次不要求上传）</div>' +
+    '</div>' +
+    '<div class="detail-card">' +
+      '<div class="detail-title">' +
+        '<div class="dname">' + UI.esc(item.name) + '</div>' +
+        UI.typePill(item) + UI.statusPill(item) +
+      '</div>' +
+      '<div class="drow"><div class="dk">类别</div><div class="dv">' + UI.esc(item.category) + '</div></div>' +
+      '<div class="drow"><div class="dk">地点</div><div class="dv">' + UI.esc(item.location) + '</div></div>' +
+      '<div class="drow"><div class="dk">' + timeLabel + '</div><div class="dv">' + UI.esc(Store.formatTime(item.time)) + '</div></div>' +
+      '<div class="drow"><div class="dk">描述</div><div class="dv">' + (item.desc ? UI.esc(item.desc) : '<span style="color:#9CA3AF">（无）</span>') + '</div></div>' +
+      '<div class="drow"><div class="dk">联系方式</div><div class="dv">' + UI.esc(item.contact) + '</div></div>' +
+      '<div class="drow"><div class="dk">发布时间</div><div class="dv">' + UI.esc(Store.formatTime(item.createdAt)) + '</div></div>' +
+    '</div>' +
+    tl;
+
+  /* ---------- 底部操作区 ---------- */
+  if (Store.isMine(id)) {
+    /* 本人发布：开放"修改状态 / 删除"，这是状态闭环的入口 */
+    cta.innerHTML =
+      '<button class="ghost" id="btnStatus">' +
+        (item.status === 'resolved' ? '改回未解决' : (isLost ? '标记已找到' : '标记已归还')) +
+      '</button>' +
+      '<button class="danger" id="btnDelete">删除</button>';
+    cta.style.display = 'flex';
+
+    document.getElementById('btnStatus').addEventListener('click', function () {
+      var toResolved = item.status !== 'resolved';
+      UI.dialog({
+        title: toResolved ? '确认标记状态？' : '确认改回未解决？',
+        sub: toResolved
+          ? '标记后，其他同学在首页将看到"' + (isLost ? '已找到' : '已归还') + '"，不再产生无效询问'
+          : '如果物品仍未找到/归还，可以改回"未解决"',
+        okText: toResolved ? '确认标记' : '确认改回',
+        onOk: function () {
+          Store.updateStatus(id, toResolved ? 'resolved' : 'active');
+          location.reload(); // 数据已更新，重新渲染
+        }
+      });
+    });
+
+    document.getElementById('btnDelete').addEventListener('click', function () {
+      UI.dialog({
+        title: '确认删除？',
+        sub: '删除后不可恢复，其他同学也无法再看到这条信息',
+        okText: '确认删除',
+        danger: true,
+        onOk: function () {
+          Store.deleteItem(id);
+          location.href = 'myposts.html';
+        }
+      });
+    });
+  } else {
+    /* 他人发布：联系发布者 → 弹窗展示联系方式，支持一键复制 */
+    cta.innerHTML = '<button id="btnContact">联系发布者</button>';
+    cta.style.display = 'flex';
+
+    document.getElementById('btnContact').addEventListener('click', function () {
+      var ov = UI.dialog({
+        title: isLost ? '联系失主' : '联系拾主',
+        sub: '请礼貌沟通，约定线下交接。联系方式：',
+        bodyHTML:
+          '<div style="background:#F9FAFB;border-radius:10px;padding:12px 14px;margin-top:10px;font-size:15px;color:#111827;text-align:center;">' +
+            UI.esc(item.contact) +
+          '</div>' +
+          '<button class="toast-btn" id="copyBtn" style="margin-top:12px;">📋 一键复制联系方式</button>',
+        okText: '知道了'
+      });
+      /* 一键复制：Clipboard API 优先，失败自动降级 execCommand */
+      ov.querySelector('#copyBtn').addEventListener('click', function () {
+        UI.copyText(item.contact, function (ok) {
+          UI.toast({
+            icon: ok ? '✓' : '!',
+            title: ok ? '复制成功' : '复制失败',
+            sub: ok ? '联系方式已复制到剪贴板，快去粘贴联系吧' : '请长按上方联系方式手动复制',
+            btnText: '好的'
+          });
+        });
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>
