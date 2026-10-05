@@ -4,6 +4,6 @@
   "description": "校园失物招领 —— 2026秋软件工程第二次结对作业",
   "private": true,
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test \"test/*.test.js\""
   }
 }
