@@ -8,15 +8,15 @@
 1. 打开 https://github.com/new
 2. Repository name 填：`102401529-102401521`（作业要求"第一个学号-第二个学号"）
 3. 选 **Public**，**不要**勾选 Add a README（本地已有一份，避免冲突），其余默认，点 Create repository
-4. 创建后页面会显示仓库地址：`https://github.com/你的用户名/102401529-102401521.git`
+4. 创建后页面会显示仓库地址：`https://github.com/Aranya12138/102401529-102401521.git`
 
 ## 第 2 步：102401529 推送本地代码
 
 在项目目录 `campus-lost-found/` 打开终端（Git Bash），依次执行：
 
 ```bash
-# 关联远程仓库（把"你的用户名"换成实际用户名）
-git remote add origin https://github.com/你的用户名/102401529-102401521.git
+# 关联远程仓库
+git remote add origin https://github.com/Aranya12138/102401529-102401521.git
 
 # 首次推送并建立跟踪
 git push -u origin main
@@ -27,7 +27,7 @@ git push -u origin main
 
 ## 第 3 步：102401521 fork 仓库
 
-1. 打开 `https://github.com/102401529的用户名/102401529-102401521`，点右上角 **Fork** → Create fork
+1. 打开 `https://github.com/Aranya12138/102401529-102401521`，点右上角 **Fork** → Create fork
 2. 自己的账号下会出现同名仓库（fork 来的）
 
 ## 第 4 步：102401521 开发并提交 PR
